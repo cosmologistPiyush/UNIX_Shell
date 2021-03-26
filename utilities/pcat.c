@@ -2,15 +2,15 @@
 #include<stdlib.h>
 #include<errno.h>
 #include<string.h>
+#include"getline.h"
 
 int main(int argc, char **argv) {
-    char contents[100];
-    int i;
+    size_t i, linelen;
+    char* line;
     if(argc == 1) { // case for no arguments. prints the input string on the next line.
-        while(fgets(contents, 100, stdin)) {
-            printf("%s", contents);
+        while((linelen = mygetline(&line, stdin)) != EOF) {
+            printf("%s", line);
         }
-        exit(0);
     }
     else { // works with more than one file and prints their contents in order.
         for(i=1;i<argc;i++) {
@@ -21,8 +21,8 @@ int main(int argc, char **argv) {
                 puts("wcat: cannot open file");
                 exit(1);
                 }
-            while(fgets(contents, 100, f)) {
-                printf("%s", contents);
+            while((linelen = mygetline(&line, f)) != EOF) {
+                printf("%s", line);
             }
             fclose(f);
         }
