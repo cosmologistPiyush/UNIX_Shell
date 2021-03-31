@@ -14,13 +14,54 @@ int compare(char** input, char** output, size_t c) {
     return flag;
 }
 
-int main(int argc, char **argv) {
-    size_t flag;
+int takeInput(char*** opContents, FILE* stream) {
     char* line;
-    size_t linecap=0, i=0, j, count=0;
+    size_t linecap=0, i=0, j, flag;
+    int count=0;
     ssize_t linelen;
-    char** ipContents = (char**)malloc(1);
-    char** opContents = (char**)malloc(1);
+    char** ipContents = (char**)malloc(sizeof(char*));
+    while((linelen = getline(&line, &linecap, stream)) != EOF) {
+        count++;
+        ipContents = (char**)realloc(ipContents, count*sizeof(char*));
+        if(ipContents == NULL) {
+            fprintf(stderr, "reverse: realloc failed\n");
+            exit(1);
+        }
+        ipContents[i++] = strdup(line);
+        if(ipContents == NULL) {
+            fprintf(stderr, "reverse: malloc failed\n");
+            exit(1);
+        }
+    }
+    *opContents = (char**) calloc(count, sizeof(char*));
+        if(*opContents == NULL) {
+            fprintf(stderr, "reverse: calloc failed\n");
+            exit(1);
+        }
+    for(j=0; j<count; j++) {
+        --i;
+        j[(*opContents)] = strdup(i[ipContents]);
+        if(*opContents == NULL) {
+            fprintf(stderr, "reverse: malloc failed\n");
+            exit(1);
+        }
+    }
+
+    flag = compare(ipContents, *opContents, count);
+    for(i=0; i<count; i++)
+        free(ipContents[i]);
+    if(flag == 0)
+        return count;
+    else {
+        fprintf(stderr, "reverse: input and output file must differ\n");
+        exit(1);
+    }
+    fclose(stream);
+}
+
+int main(int argc, char **argv) {
+    size_t i, count;
+    char** opContents = (char**)malloc(sizeof(char*));
 
     if(argc > 3) {
         fprintf(stderr, "usage: reverse <input> <output>\n");
@@ -38,43 +79,13 @@ int main(int argc, char **argv) {
             fprintf(stderr, "reverse: cannot open file '%s'\n", argv[2]);
             exit(1);
         }
-        while((linelen = getline(&line, &linecap, input)) != EOF) {
-            count++;
-            ipContents = (char**)realloc(ipContents, count*sizeof(char*));
-            if(ipContents == NULL) {
-                fprintf(stderr, "reverse: realloc failed\n");
-                exit(1);
-            }
-            ipContents[i++] = strdup(line);
-            if(ipContents == NULL) {
-                fprintf(stderr, "reverse: malloc failed\n");
-                exit(1);
-            }
-        }
-        opContents = (char**) calloc(count, sizeof(char*));
-            if(opContents == NULL) {
-                fprintf(stderr, "reverse: calloc failed\n");
-                exit(1);
-            }
-        for(j=0; j<count; j++) {
-            --i;
-            opContents[j] = strdup(ipContents[i]);
-            if(opContents == NULL) {
-                fprintf(stderr, "reverse: malloc failed\n");
-                exit(1);
-            }
-        }
 
-        flag = compare(ipContents, opContents, count);
-        if(flag == 0) {
+        count = takeInput(&opContents, input);
+        if(count>0)
             for(i=0; i<count; i++) 
                 fputs(opContents[i], output);
-        } else {
-            fprintf(stderr, "reverse: input and output file must differ\n");
-            exit(1);
         }
         fclose(output);
-        fclose(input);
 
     }
 
@@ -84,87 +95,21 @@ int main(int argc, char **argv) {
             fprintf(stderr, "reverse: cannot open file '%s'\n", argv[1]);
             exit(1);
         }
-        while((linelen = getline(&line, &linecap, input)) != EOF) {
-            count++;
-            ipContents = (char**)realloc(ipContents, count*sizeof(char*));
-            if(ipContents == NULL) {
-                fprintf(stderr, "reverse: realloc failed\n");
-                exit(1);
-            }
-            ipContents[i++] = strdup(line);
-            if(ipContents == NULL) {
-                fprintf(stderr, "reverse: malloc failed\n");
-                exit(1);
-            }
-        }
-        opContents = (char**) calloc(count, sizeof(char*));
-        if(opContents == NULL) {
-            fprintf(stderr, "reverse: calloc failed\n");
-            exit(1);
-        }
-        for(j=0; j<count; j++) {
-            --i;
-            opContents[j] = strdup(ipContents[i]);
-            if(opContents == NULL) {
-                fprintf(stderr, "reverse: malloc failed\n");
-                exit(1);
-            }
-        }
-
-        flag = compare(ipContents, opContents, count);
-        if(flag == 0) {
+        count = takeInput(&opContents, input);
+        if(count>0)
             for(i=0; i<count; i++) 
                 fputs(opContents[i], stdout);
-        } else {
-            fprintf(stderr, "reverse: input and output file must differ\n");
-            exit(1);
-        }
-        fclose(input);
     }
 
     else {
-        while((linelen = getline(&line, &linecap, stdin)) != EOF) {
-            count++;
-            ipContents = (char**)realloc(ipContents, count*sizeof(char*));
-            if(ipContents == NULL) {
-                fprintf(stderr, "reverse: realloc failed\n");
-                exit(1);
-            }
-            ipContents[i] = (char*) malloc(linelen);
-            if(ipContents == NULL) {
-                fprintf(stderr, "reverse: malloc failed\n");
-                exit(1);
-            }
-            strcpy(ipContents[i++], line);
-        }
-        opContents = (char**) calloc(count, sizeof(char*));
-        if(opContents == NULL) {
-            fprintf(stderr, "reverse: calloc failed\n");
-            exit(1);
-        }
-        for(j=0; j<count; j++) {
-            --i;
-            opContents[j] = (char*) malloc(sizeof(ipContents[i]));
-            if(opContents == NULL) {
-                fprintf(stderr, "reverse: malloc failed\n");
-                exit(1);
-            }
-            strcpy(opContents[j], ipContents[i]);
-        }
-
-        flag = compare(ipContents, opContents, count);
-        if(flag == 0) {
+        count = takeInput(&opContents, stdin);
+        if(count>0)
             for(i=0; i<count; i++) 
                 fputs(opContents[i], stdout);
-        } else {
-            fprintf(stderr, "Input and Output file must differ\n");
-            exit(1);
-        }
     }
     
-    for(i=0; i<count; i++) {
-        free(ipContents[i]);
+    for(i=0; i<count; i++)
         free(opContents[i]);
-    }
+    
     return 0;
 }
