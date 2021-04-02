@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
             if(line[linelen-1] == '\n')
                 line[linelen-1] = '\0';
             if((linelen == 5) && (strcmp(line, "exit") == 0))
-                return 0;
+                exit(0);
 
             do {
                 count++;
@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
             } while(line !=  NULL);
             input[i] = NULL;
             pid = fork();
-
+            int status;
             if(pid < 0) {
                 puts("wish: Fork error");
                 exit(1);
@@ -41,9 +41,11 @@ int main(int argc, char *argv[]) {
                 execv(input[0], input);
                 printf("e: %i\n", errno);
                 perror("Error");
+                //printf("wish> ");
+                break;
             } else {
                 //pid = waitpid(pid, NULL);
-                wait(NULL);
+                waitpid(pid, &status, 0);
                 fflush(stdin);
                 printf("wish> ");
             }
