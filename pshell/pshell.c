@@ -7,8 +7,9 @@
 #include<sys/wait.h>
 #include<errno.h>
 
-void defaultCommands(char*** input, char** path) { //creates an absolute path for shell commands
-    char **ip = *input; // gets the name of file/command
+static char** cmd;
+void defaultCommands(char** path) { //creates an absolute path for shell commands
+    char **ip = cmd; // gets the name of file/command
 
     for(char **it = path; (it) && (*it); ++it) { //pointer variable iterates over path array
         size_t size = (size_t)(strlen(*ip) + strlen(*it) + 2); // size of the full absolute path
@@ -29,7 +30,7 @@ int main(int argc, char *argv[]) {
     ssize_t linelen=0;
     int status;
     pid_t pid;
-    char **input = (char**) malloc(sizeof(char*)); 
+    cmd = (char**) malloc(sizeof(char*)); 
     char **path = (char**) malloc(4*sizeof(char const*));
     char **temp = path;
     *temp++ = NULL;
@@ -52,21 +53,21 @@ int main(int argc, char *argv[]) {
 
             do {
                 count++; // counter for number of char pointers
-                input = (char**)realloc(input, count*sizeof(char*));
-                input[i++] = strdup(strsep(&line, " ")); // seperate contents of line by space pointed to by an array of char pointers
+                cmd = (char**)realloc(cmd, count*sizeof(char*));
+                cmd[i++] = strdup(strsep(&line, " ")); // seperate contents of line by space pointed to by an array of char pointers
             } while(line !=  NULL);
-            input[i] = NULL; // last pointer to null
+            cmd[i] = NULL; // last pointer to null
 
-            if(!(input[0][0] == '/')) // if not a full mentioned path for executable
-                defaultCommands(&input, path); // i.e a shell command
+            if(!(cmd[0][0] == '/')) // if not a full mentioned path for executable
+                defaultCommands(path); // i.e a shell command
 
             pid = fork();
             if(pid < 0) {
                 puts("wish: Fork error");
                 exit(1);
             } else if(pid == 0) {
-                printf("cmd: %s\nargs: %s\n", *input, input[1]);
-                execv(*input, input);
+                printf("cmd: %s\nargs: %s\n", *cmd, cmd[1]);
+                execv(*cmd, cmd);
                 printf("e: %i\n", errno);
                 perror("Error");
                 exit(127);
@@ -75,15 +76,15 @@ int main(int argc, char *argv[]) {
                 if(pid > 0) {
                     printf("wish> ");
                     for(size_t i=0; i<count; i++)
-                        free(input[i]);
+                        free(cmd[i]);
                 } else
                     perror("Error");
             }
             fflush(stdin);
         }
     } else if(argc == 2) {
-        FILE* input = fopen(argv[1], "r");
-        if(input == NULL) {
+        FILE* cmd = fopen(argv[1], "r");
+        if(cmd == NULL) {
             perror("e");
             exit(1);
         }
