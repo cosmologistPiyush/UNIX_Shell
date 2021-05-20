@@ -1,27 +1,39 @@
-#include<stdio.h>
-#include<string.h>
-#include<stdlib.h>
-#include"path.h"
-#include<unistd.h>
-#include<sys/types.h>
-#include<sys/wait.h>
-#include<errno.h>
+#include"helper.h"
 
 static char** cmd;
 void defaultCommands(char** path) { //creates an absolute path for shell commands
-    char **ip = cmd; // gets the name of file/command
 
     for(char **it = path; (it) && (*it); ++it) { //pointer variable iterates over path array
-        size_t size = (size_t)(strlen(*ip) + strlen(*it) + 2); // size of the full absolute path
+        size_t size = (size_t)(strlen(*cmd) + strlen(*it) + 2); // size of the full absolute path
         char check[size];
-        snprintf(check, size, "%s/%s", *it, *ip); // writes the new absolute path in check variable
+        snprintf(check, size, "%s/%s", *it, *cmd); // writes the new absolute path in check variable
         if(!access(check, X_OK)) { //checks if the file is executable
-            free(*ip);
-            *ip = strdup(check); // replaces file name with absolute path
-            printf("cmd: %s\n", *ip);
+            free(*cmd);
+            *cmd = strdup(check); // replaces file name with absolute path
             break;
         }
     }
+}
+
+int trimSpaces(char** input, size_t end) {
+    size_t j, count = 1;
+    while(j < end) {
+        if(strcmp(input[j], "") == 0)
+            j++;
+        else {
+            count++;
+            if((cmd = realloc(cmd, count*sizeof(char*))) == NULL) {
+                printf("e: %i\n", errno);
+                perror("realloc failed while trimming spaces");
+                exit(1);
+            }
+            cmd[count-2] = strdup(input[j++]);
+        }
+    }
+    cmd[count-1] = NULL;
+    for(j=0; j<end; j++)
+        free(input[j]);
+    return count;
 }
 
 int main(int argc, char *argv[]) {
@@ -31,16 +43,18 @@ int main(int argc, char *argv[]) {
     int status;
     pid_t pid;
     cmd = (char**) malloc(sizeof(char*)); 
-    char **path = (char**) malloc(4*sizeof(char const*));
-    char **temp = path;
-    *temp++ = NULL;
-    *temp++ = strdup("/usr/bin");
-    *temp++ = strdup("/bin");
-    *temp = NULL;
+    char** input = malloc(sizeof(char*));
+    char **path = (char**) malloc(sizeof(char*));
+    if((!input) || (!cmd) || (!path)) {
+        printf("e: %i\n", errno);
+        perror("malloc in the beginning of main failed");
+        exit(1);
+    }
+
     if(argc == 1) {
         printf("wish> ");
         while((linelen = getline(&line, &linecap, stdin)) != EOF) {
-            i=count=0;
+            i=count=1;
             if(*line == '\n') { //provides default shell like enter key functionality
                 printf("wish> ");
                 continue;
@@ -49,27 +63,47 @@ int main(int argc, char *argv[]) {
                 line[linelen-1] = '\0';
             if((linelen == 5) && (strcmp(line, "exit") == 0)) //exit command
                 exit(0);
-            *path = strdup(getcwd(NULL, 0)); // adds current working directory to path
+            //*path = strdup(getcwd(NULL, 0)); // adds current working directory to path
 
             do {
                 count++; // counter for number of char pointers
-                cmd = (char**)realloc(cmd, count*sizeof(char*));
-                cmd[i++] = strdup(strsep(&line, " ")); // seperate contents of line by space pointed to by an array of char pointers
+                if((input = realloc(input, count*sizeof(char*))) == NULL) {
+                    printf("e: %i\n", errno);
+                    perror("realloc failed to seperate input");
+                    exit(1);
+                }
+                input[count-2] = strdup(strsep(&line, " ")); // seperate contents of line by space pointed to by an array of char pointers
             } while(line !=  NULL);
-            cmd[i] = NULL; // last pointer to null
+            //fflush(stdin);
 
-            if(!(cmd[0][0] == '/')) // if not a full mentioned path for executable
-                defaultCommands(path); // i.e a shell command
+            count = trimSpaces(input, count-1);
+
+            if(!((cmd[0][0] == '/') && (cmd[0][0] == '.'))) { // if not a full mentioned path for executable
+                if(strcmp(*cmd, "cd") == 0) {
+                    if(cd(cmd, count-1) < 0)
+                        perror("cd failed");
+                    printf("wish> ");
+                    continue;
+                }
+                else if(strcmp(*cmd, "path") == 0) {
+                    if(makePath(cmd, &path, count-1) < 0)
+                        perror("setting path failed");
+                    printf("wish> ");
+                    continue;
+                }
+                else
+                    defaultCommands(path); // i.e a shell command
+            }
 
             pid = fork();
             if(pid < 0) {
                 puts("wish: Fork error");
                 exit(1);
             } else if(pid == 0) {
-                printf("cmd: %s\nargs: %s\n", *cmd, cmd[1]);
+                //printf("cmd: %s\nargs: %s\n", *cmd, cmd[1]);
                 execv(*cmd, cmd);
                 printf("e: %i\n", errno);
-                perror("Error");
+                perror("exec error");
                 exit(127);
             } else {
                 pid = waitpid(pid, &status, 0);
@@ -80,7 +114,6 @@ int main(int argc, char *argv[]) {
                 } else
                     perror("Error");
             }
-            fflush(stdin);
         }
     } else if(argc == 2) {
         FILE* cmd = fopen(argv[1], "r");
