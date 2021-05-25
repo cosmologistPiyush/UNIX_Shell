@@ -1,6 +1,12 @@
 #include"helper.h"
+#include"fcntl.h" 
+#include<sys/types.h>
+#include<sys/wait.h>
+#include<assert.h>
 
 static char** cmd;
+char error_msg[30] = "An error has occured\n";
+
 void defaultCommands(char** path) { //creates an absolute path for shell commands
 
     for(char **it = path; (it) && (*it); ++it) { //pointer variable iterates over path array
@@ -70,11 +76,11 @@ int main(int argc, char *argv[]) {
                 if((input = realloc(input, count*sizeof(char*))) == NULL) {
                     printf("e: %i\n", errno);
                     perror("realloc failed to seperate input");
+                    write(STDERR_FILENO, error_msg, 30);
                     exit(1);
                 }
                 input[count-2] = strdup(strsep(&line, " ")); // seperate contents of line by space pointed to by an array of char pointers
             } while(line !=  NULL);
-            //fflush(stdin);
 
             count = trimSpaces(input, count-1);
 
@@ -95,12 +101,27 @@ int main(int argc, char *argv[]) {
                     defaultCommands(path); // i.e a shell command
             }
 
+            i=1;
+            for(;i<count-1; i++) {
+                if(strcmp(cmd[i], ">") == 0) {
+                    int newOp;
+                    if((newOp = open(cmd[i+1], O_CREAT|O_TRUNC|O_WRONLY, S_IWUSR)) != -1) {
+                        dup2(STDOUT_FILENO, STDERR_FILENO);
+                        dup2(newOp, STDOUT_FILENO);
+                        assert(newOp = 1);
+                        break;
+                    }
+                    else
+                        perror("File opening error");
+
+                }
+            }
+
             pid = fork();
             if(pid < 0) {
                 puts("wish: Fork error");
                 exit(1);
             } else if(pid == 0) {
-                //printf("cmd: %s\nargs: %s\n", *cmd, cmd[1]);
                 execv(*cmd, cmd);
                 printf("e: %i\n", errno);
                 perror("exec error");
@@ -109,16 +130,26 @@ int main(int argc, char *argv[]) {
                 pid = waitpid(pid, &status, 0);
                 if(pid > 0) {
                     printf("wish> ");
-                    for(size_t i=0; i<count; i++)
+                    for(size_t i=0; i<count-1; i++)
                         free(cmd[i]);
                 } else
                     perror("Error");
+
+                //if(i != 0) {
+                int stout = fileno(freopen("/dev/null", "w", stdout));
+                dup2(stout, 1);
+                assert(stout == 1);
+                int sterr = fileno(freopen("/dev/null", "w", stderr));
+                dup2(sterr, 2);
+                assert(sterr == 2);
+                //}
+
             }
         }
     } else if(argc == 2) {
         FILE* cmd = fopen(argv[1], "r");
         if(cmd == NULL) {
-            perror("e");
+            write(STDERR_FILENO, error_msg, 30);
             exit(1);
         }
 
