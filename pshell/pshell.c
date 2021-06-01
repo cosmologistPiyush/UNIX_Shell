@@ -1,5 +1,4 @@
 #include"helper.h"
-#include"fcntl.h" 
 #include<sys/types.h>
 #include<sys/wait.h>
 #include<assert.h>
@@ -51,6 +50,7 @@ int main(int argc, char *argv[]) {
     cmd = (char**) malloc(sizeof(char*)); 
     char** input = malloc(sizeof(char*));
     char **path = (char**) malloc(sizeof(char*));
+    *path = NULL;
     if((!input) || (!cmd) || (!path)) {
         printf("e: %i\n", errno);
         perror("malloc in the beginning of main failed");
@@ -101,22 +101,6 @@ int main(int argc, char *argv[]) {
                     defaultCommands(path); // i.e a shell command
             }
 
-            i=1;
-            for(;i<count-1; i++) {
-                if(strcmp(cmd[i], ">") == 0) {
-                    int newOp;
-                    if((newOp = open(cmd[i+1], O_CREAT|O_TRUNC|O_WRONLY, S_IWUSR)) != -1) {
-                        dup2(STDOUT_FILENO, STDERR_FILENO);
-                        dup2(newOp, STDOUT_FILENO);
-                        assert(newOp = 1);
-                        break;
-                    }
-                    else
-                        perror("File opening error");
-
-                }
-            }
-
             pid = fork();
             if(pid < 0) {
                 puts("wish: Fork error");
@@ -130,19 +114,10 @@ int main(int argc, char *argv[]) {
                 pid = waitpid(pid, &status, 0);
                 if(pid > 0) {
                     printf("wish> ");
-                    for(size_t i=0; i<count-1; i++)
+                   for(size_t i=0; i<count-1; i++)
                         free(cmd[i]);
                 } else
-                    perror("Error");
-
-                //if(i != 0) {
-                int stout = fileno(freopen("/dev/null", "w", stdout));
-                dup2(stout, 1);
-                assert(stout == 1);
-                int sterr = fileno(freopen("/dev/null", "w", stderr));
-                dup2(sterr, 2);
-                assert(sterr == 2);
-                //}
+                    perror("Wrong pid by wait");
 
             }
         }
