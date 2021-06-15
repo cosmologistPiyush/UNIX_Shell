@@ -11,6 +11,8 @@ int cd(char** input, size_t argc) {
     if(strcmp(input[1], "~") == 0) {
         free(input[1]);
         input[1] = strdup("/Users/piyushsachdeva");
+        if(input[1] == NULL)
+            return ENOMEM;
         return chdir(input[1]);
     }
     else if(input[1][0] == '.') { //make absolute path

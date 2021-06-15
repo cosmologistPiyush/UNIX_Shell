@@ -86,13 +86,13 @@ int main(int argc, char *argv[]) {
 
             if(!((cmd[0][0] == '/') && (cmd[0][0] == '.'))) { // if not a full mentioned path for executable
                 if(strcmp(*cmd, "cd") == 0) {
-                    if(cd(cmd, count-1) < 0)
+                    if(cd(cmd, count-1) != 0)
                         perror("cd failed");
                     printf("wish> ");
                     continue;
                 }
                 else if(strcmp(*cmd, "path") == 0) {
-                    if(makePath(cmd, &path, count-1) < 0)
+                    if(makePath(cmd, &path, count-1) != 0)
                         perror("setting path failed");
                     printf("wish> ");
                     continue;
