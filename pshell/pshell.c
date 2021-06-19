@@ -4,7 +4,6 @@
 #include<assert.h>
 
 static char** cmd;
-char error_msg[30] = "An error has occured\n";
 bool redirection = false;
 
 void defaultCommands(char** path) { //creates an absolute path for shell commands
@@ -35,6 +34,7 @@ int main(int argc, char *argv[]) {
     int status;
     commands *all;
     cpid_t *pids;
+    FILE* stream;
     char **path = (char**) malloc(sizeof(char*));
     *path = NULL;
     if(!path) {
@@ -43,94 +43,97 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    if(argc == 1) {
-        printf("wish> ");
-        while((linelen = getline(&line, &linecap, stdin)) != EOF) {
-            if(*line == '\n') { //provides default shell like enter key functionality
-                printf("wish> ");
-                continue;
-            }
-            if(strcmp(line, "exit\n") == 0) //exit command
-                exit(0);
-
-            all = effIpProcessing(&line, linelen-1);
-            pids = calloc(all->num, sizeof(*pids));
-
-            for(i=0; i<all->num; i++) {
-
-                cmd = all->cmds[i];
-                for(char**k = cmd; k && *k; k++)
-                    count++;
-                //printf("count: %zi\n", count);
-
-                if(!((cmd[0][0] == '/') && (cmd[0][0] == '.'))) { // if not a full mentioned path for executable
-                    if(strcmp(*cmd, "cd") == 0) {
-                        if(cd(cmd, count) != 0)
-                            perror("cd failed"); // cmd is freed at the end
-                        goto out;
-                    }
-                    else if(strcmp(*cmd, "path") == 0) {
-                        int success = makePath(cmd, &path, count);
-                        if(success != 0) {
-                            perror("setting path failed");
-
-                            if(success == ENOMEM) {
-                                for(char**it = path; it && *it; it++)
-                                    free(it);
-                            }
-                        }
-                        goto out;
-                    }
-                    else
-                        defaultCommands(path); // i.e a shell command
-                }
-
-                pids[i].pid = fork();
-                if(pids[i].pid < 0) {
-                    puts("wish: Fork error");
-                    exit(1);
-                } if(pids[i].pid == 0) {
-                    if(strcmp(cmd[count-1], "&") == 0) {
-                        pids[i].backgrd = true;
-                        background(pids[i].pid);
-                        free(cmd[count-1]);
-                        cmd[count-1] = NULL;
-                    }
-                    execv(*cmd, cmd);
-                    printf("e: %i\n", errno);
-                    perror("exec error");
-                    exit(127);
-                } 
-            }
-            for(j=0; j<all->num; j++) {
-                if(!pids[j].backgrd) {
-                    pids[j].pid = wait(&status);
-                    assert(pids[j].pid > 0);
-                }
-            }
-
-out:
-            count = 0;
-            printf("wish> ");
-            for(i=0; i<all->num; i++) {
-                for(char** k = all->cmds[i]; k && *k; k++)
-                    free(*k);
-            }
-            free(all->cmds);
-            free(all);
-
-        }
-    } else if(argc == 2) {
-        FILE* cmd = fopen(argv[1], "r");
-        if(cmd == NULL) {
-            write(STDERR_FILENO, error_msg, 30);
+    if(argc == 2) {
+        stream = fopen(argv[1], "r");
+        if(stream == NULL) {
+            perror("cant't open batch processing file");
             exit(1);
         }
-
-        return 0;
-    } else {
-        puts("errro");
+    } else if(argc == 1)
+        stream = stdin;
+    else {
+        perror("too many arguments");
         exit(1);
+    }
+
+    printf("wish> ");
+    while((linelen = getline(&line, &linecap, stream)) != EOF) {
+
+        assert(linelen > 0);
+
+        if(*line == '\n') { //provides default shell like enter key functionality
+            printf("wish> ");
+            continue;
+        }
+        if(strcmp(line, "exit\n") == 0) //exit command
+            exit(0);
+
+        all = effIpProcessing(&line, linelen-1);
+        pids = calloc(all->num, sizeof(*pids));
+
+        for(i=0; i<all->num; i++) {
+
+            cmd = all->cmds[i];
+            for(char**k = cmd; k && *k; k++)
+                count++;
+            //printf("count: %zi\n", count);
+
+            if(!((cmd[0][0] == '/') && (cmd[0][0] == '.'))) { // if not a full mentioned path for executable
+                if(strcmp(*cmd, "cd") == 0) {
+                    if(cd(cmd, count) != 0)
+                        perror("cd failed"); // cmd is freed at the end
+                    goto out;
+                }
+                else if(strcmp(*cmd, "path") == 0) {
+                    int success = makePath(cmd, &path, count);
+                    if(success != 0) {
+                        perror("setting path failed");
+
+                        if(success == ENOMEM) {
+                            for(char**it = path; it && *it; it++)
+                                free(it);
+                        }
+                    }
+                    goto out;
+                }
+                else
+                    defaultCommands(path); // i.e a shell command
+            }
+
+            pids[i].pid = fork();
+            if(pids[i].pid < 0) {
+                puts("wish: Fork error");
+                exit(1);
+            } if(pids[i].pid == 0) {
+                if(strcmp(cmd[count-1], "&") == 0) {
+                    pids[i].backgrd = true;
+                    background(pids[i].pid);
+                    free(cmd[count-1]);
+                    cmd[count-1] = NULL;
+                }
+                execv(*cmd, cmd);
+                printf("e: %i\n", errno);
+                perror("exec error");
+                exit(127);
+            } 
+        }
+        for(j=0; j<all->num; j++) {
+            if(!pids[j].backgrd) {
+                pids[j].pid = wait(&status);
+                assert(pids[j].pid > 0);
+            }
+        }
+
+out:
+        count = 0;
+        printf("wish> ");
+        for(i=0; i<all->num; i++) {
+            for(char** k = all->cmds[i]; k && *k; k++)
+                free(*k);
+        }
+        free(all->cmds);
+        free(all);
+
     }
 
     return 0;
