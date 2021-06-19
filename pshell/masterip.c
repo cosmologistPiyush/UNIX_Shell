@@ -1,21 +1,6 @@
-#include<stdio.h>
-#include<string.h>
-#include<stdlib.h>
-#include<stdbool.h>
-#include<assert.h>
+#include"helper.h"
 
-typedef struct inputsize {
-    size_t strsincmd;
-    size_t* stringsize;
-}input;
-
-typedef struct commands {
-    char*** cmds;
-    size_t num;
-}commands;
-
-char*** creatingArray(commands* data, input* allcmds, char** line, size_t len);
-bool redirection;
+extern bool redirection;
 
 commands* effIpProcessing(char** string, size_t len) {
     input *allcmds = malloc(sizeof(input));
@@ -39,10 +24,11 @@ commands* effIpProcessing(char** string, size_t len) {
     for(i=0; i<len; i++) {
         switch(line[i]) {
             case '&':
-                sic += 1;
-                ss = realloc(ss, sic*sizeof(input));
+                sic += 2;
+                ss = realloc(ss, sic*sizeof(size_t));
                 if(ss == NULL)
                     goto out;
+                ss[sic-2] = 1;
                 ss[sic-1] = '\0';
                 data->num += 1;
                 allcmds = realloc(allcmds, data->num*sizeof(input));
@@ -89,12 +75,17 @@ commands* effIpProcessing(char** string, size_t len) {
         }
     }
 
+    if(ss[sic-1] != '\0') {
+        sic += 1;
+        ss = realloc(ss, sic*sizeof(size_t));
+        if(ss == NULL)
+            goto out;
+        ss[sic-1] = '\0';
+    }
+
     /* populating the array */
     if(sic == 0) {
         data->num -= 1;
-        sic += 1;
-        ss = realloc(ss, sic*sizeof(input));
-        ss[sic-1] = '\0';
         data->cmds = creatingArray(data, allcmds, string, len);
         data->num += 1;
     } else
@@ -149,6 +140,8 @@ char*** creatingArray(commands* data, input* allcmds, char** line, size_t len) {
     while(*ptr != '\n') {
         switch(*ptr) {
             case '&':
+                j++;
+                memcpy(cmd[i][j], ptr, ss[j]);
                 i++;
                 j=0;
                 ptr++;
@@ -190,7 +183,7 @@ out:
 
 }
 
-int main() {
+/*int main() {
     char* line = NULL;
     size_t linecap=0, i;
     ssize_t linelen;
@@ -220,4 +213,4 @@ int main() {
     free(all->cmds);
     free(all);
     return 0;
-}
+}*/

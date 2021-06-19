@@ -5,6 +5,7 @@
 
 static char** cmd;
 char error_msg[30] = "An error has occured\n";
+bool redirection = false;
 
 void defaultCommands(char** path) { //creates an absolute path for shell commands
 
@@ -20,38 +21,23 @@ void defaultCommands(char** path) { //creates an absolute path for shell command
     }
 }
 
-int trimSpaces(char** input, size_t end) {
-    size_t j, count = 1;
-    while(j < end) {
-        if(strcmp(input[j], "") == 0)
-            j++;
-        else {
-            count++;
-            if((cmd = realloc(cmd, count*sizeof(char*))) == NULL) {
-                printf("e: %i\n", errno);
-                perror("realloc failed while trimming spaces");
-                exit(1);
-            }
-            cmd[count-2] = strdup(input[j++]);
-        }
-    }
-    cmd[count-1] = NULL;
-    for(j=0; j<end; j++)
-        free(input[j]);
-    return count;
+void background(pid_t pid) {
+    char *msg = NULL;
+    sprintf(msg, "pid: %i\trunning in background", pid);
+    write(STDERR_FILENO, "+[1]", 4);
+    write(STDERR_FILENO, msg, sizeof(msg));
 }
 
 int main(int argc, char *argv[]) {
     char *line=NULL;
-    size_t linecap=0, count, i;
+    size_t linecap=0, i, j, count;
     ssize_t linelen=0;
     int status;
-    pid_t pid;
-    cmd = (char**) malloc(sizeof(char*)); 
-    char** input = malloc(sizeof(char*));
+    commands *all;
+    cpid_t *pids;
     char **path = (char**) malloc(sizeof(char*));
     *path = NULL;
-    if((!input) || (!cmd) || (!path)) {
+    if(!path) {
         printf("e: %i\n", errno);
         perror("malloc in the beginning of main failed");
         exit(1);
@@ -60,66 +46,79 @@ int main(int argc, char *argv[]) {
     if(argc == 1) {
         printf("wish> ");
         while((linelen = getline(&line, &linecap, stdin)) != EOF) {
-            i=count=1;
             if(*line == '\n') { //provides default shell like enter key functionality
                 printf("wish> ");
                 continue;
             }
-            if(line[linelen-1] == '\n')
-                line[linelen-1] = '\0';
-            if((linelen == 5) && (strcmp(line, "exit") == 0)) //exit command
+            if(strcmp(line, "exit\n") == 0) //exit command
                 exit(0);
-            //*path = strdup(getcwd(NULL, 0)); // adds current working directory to path
 
-            do {
-                count++; // counter for number of char pointers
-                if((input = realloc(input, count*sizeof(char*))) == NULL) {
-                    printf("e: %i\n", errno);
-                    perror("realloc failed to seperate input");
-                    write(STDERR_FILENO, error_msg, 30);
+            all = effIpProcessing(&line, linelen-1);
+            pids = calloc(all->num, sizeof(*pids));
+
+            for(i=0; i<all->num; i++) {
+
+                cmd = all->cmds[i];
+                for(char**k = cmd; k && *k; k++)
+                    count++;
+                //printf("count: %zi\n", count);
+
+                if(!((cmd[0][0] == '/') && (cmd[0][0] == '.'))) { // if not a full mentioned path for executable
+                    if(strcmp(*cmd, "cd") == 0) {
+                        if(cd(cmd, count) != 0)
+                            perror("cd failed"); // cmd is freed at the end
+                        goto out;
+                    }
+                    else if(strcmp(*cmd, "path") == 0) {
+                        int success = makePath(cmd, &path, count);
+                        if(success != 0) {
+                            perror("setting path failed");
+
+                            if(success == ENOMEM) {
+                                for(char**it = path; it && *it; it++)
+                                    free(it);
+                            }
+                        }
+                        goto out;
+                    }
+                    else
+                        defaultCommands(path); // i.e a shell command
+                }
+
+                pids[i].pid = fork();
+                if(pids[i].pid < 0) {
+                    puts("wish: Fork error");
                     exit(1);
+                } if(pids[i].pid == 0) {
+                    if(strcmp(cmd[count-1], "&") == 0) {
+                        pids[i].backgrd = true;
+                        background(pids[i].pid);
+                        free(cmd[count-1]);
+                        cmd[count-1] = NULL;
+                    }
+                    execv(*cmd, cmd);
+                    printf("e: %i\n", errno);
+                    perror("exec error");
+                    exit(127);
+                } 
+            }
+            for(j=0; j<all->num; j++) {
+                if(!pids[j].backgrd) {
+                    pids[j].pid = wait(&status);
+                    assert(pids[j].pid > 0);
                 }
-                input[count-2] = strdup(strsep(&line, " ")); // seperate contents of line by space pointed to by an array of char pointers
-            } while(line !=  NULL);
-
-            count = trimSpaces(input, count-1);
-
-            if(!((cmd[0][0] == '/') && (cmd[0][0] == '.'))) { // if not a full mentioned path for executable
-                if(strcmp(*cmd, "cd") == 0) {
-                    if(cd(cmd, count-1) != 0)
-                        perror("cd failed");
-                    printf("wish> ");
-                    continue;
-                }
-                else if(strcmp(*cmd, "path") == 0) {
-                    if(makePath(cmd, &path, count-1) != 0)
-                        perror("setting path failed");
-                    printf("wish> ");
-                    continue;
-                }
-                else
-                    defaultCommands(path); // i.e a shell command
             }
 
-            pid = fork();
-            if(pid < 0) {
-                puts("wish: Fork error");
-                exit(1);
-            } else if(pid == 0) {
-                execv(*cmd, cmd);
-                printf("e: %i\n", errno);
-                perror("exec error");
-                exit(127);
-            } else {
-                pid = waitpid(pid, &status, 0);
-                if(pid > 0) {
-                    printf("wish> ");
-                   for(size_t i=0; i<count-1; i++)
-                        free(cmd[i]);
-                } else
-                    perror("Wrong pid by wait");
-
+out:
+            count = 0;
+            printf("wish> ");
+            for(i=0; i<all->num; i++) {
+                for(char** k = all->cmds[i]; k && *k; k++)
+                    free(*k);
             }
+            free(all->cmds);
+            free(all);
+
         }
     } else if(argc == 2) {
         FILE* cmd = fopen(argv[1], "r");
@@ -136,4 +135,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-
