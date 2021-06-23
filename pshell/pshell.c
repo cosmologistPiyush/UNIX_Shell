@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
         if(strcmp(line, "exit\n") == 0) //exit command
-            exit(0);
+            goto quit;
 
         all = effIpProcessing(&line, linelen-1);
         pids = calloc(all->num, sizeof(*pids));
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
                     goto out;
                 }
                 else if(strcmp(*cmd, "path") == 0) {
-                    int success = makePath(cmd, &path, count);
+                    int success = makePath(cmd, &path, count); //null terminated
                     if(success != 0) {
                         perror("setting path failed");
 
@@ -137,4 +137,24 @@ out:
     }
 
     return 0;
+quit:
+    if(path) {
+        for(char** it = path; it && *it; it++)
+            free(*it);
+        free(path);
+    }
+    /*if(all) {
+        if(all->cmds) {
+            for(i=0; i<all->num; i++) {
+                puts("entering in");
+                for(char**k = all->cmds[i]; k && *k; k++)
+                    free(*k);
+            }
+        puts("exiting cmdsinner");
+        free(all->cmds);
+        }
+        puts("exiting cmds");
+        free(all);
+    }*/
+    exit(0);
 }

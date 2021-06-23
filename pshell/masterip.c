@@ -100,6 +100,13 @@ commands* effIpProcessing(char** string, size_t len) {
     return data;
 
 out:
+    free(data);
+    for(input* ip = allcmds; ip; ip++) {
+        if(ip->stringsize)
+            free(ip->stringsize);
+    }
+    free(allcmds);
+
     perror("realloc/malloc failed");
     exit(1);
 
@@ -110,10 +117,8 @@ out:
 char*** creatingArray(commands* data, input* allcmds, char** line, size_t len) {
 
     data->cmds = calloc(data->num, sizeof(char**));
-    if(data->cmds == NULL) {
-        perror("malloc error");
-        exit(1);
-    }
+    if(data->cmds == NULL)
+        goto out;
 
     char*** cmd = data->cmds;
 
@@ -173,6 +178,12 @@ char*** creatingArray(commands* data, input* allcmds, char** line, size_t len) {
     return cmd;
 
 out:
+    for(char*** ip = data->cmds; ip; ip++) {
+        for(char** it = *ip; it && *it; it++)
+            free(*it);
+        free(*ip);
+    }
+    free(data->cmds);
     perror("calloc/malloc failed");
     exit(1);
 
@@ -193,7 +204,6 @@ out:
     assert(linelen != 0);
     puts("processing begins");
     all = effIpProcessing(&line, linelen-1);
-
 
     char** j;
 
