@@ -1,10 +1,11 @@
 #include"helper.h"
 #include<sys/types.h>
 #include<sys/wait.h>
+#include<fcntl.h>
 #include<assert.h>
 
 static char** cmd;
-char error_msg[30] = "An error has occured\n";
+//char error_msg[30] = "An error has occured\n";
 
 void defaultCommands(char** path) { //creates an absolute path for shell commands
 
@@ -41,6 +42,31 @@ int trimSpaces(char** input, size_t end) {
     return count;
 }
 
+//int redirection(size_t end, int *file) {
+void redirection(size_t end, int *file) {
+    int flag=0, i=1;
+    char* first;
+    for(;i<end-1; i++) {
+        //if((first = strstr(cmd[i], ">")) != NULL) {
+        if(strcmp(cmd[i], ">") == 0) {
+            flag = 1;
+            *file = open(cmd[i+1], O_CREAT|O_WRONLY|O_TRUNC, S_IWUSR|S_IRUSR|S_IRGRP|S_IWGRP);
+            assert(*file != -1);
+            dup2(*file, STDOUT_FILENO);
+            dup2(*file, STDERR_FILENO);
+            free(cmd[i+1]);
+            free(cmd[i]);
+            cmd[i] = NULL;
+            cmd = realloc(cmd, (i+1)*sizeof(char*));
+            return;
+            //break;
+        }
+
+    }
+    //return flag;
+}
+        
+
 int main(int argc, char *argv[]) {
     char *line=NULL;
     size_t linecap=0, count, i;
@@ -76,7 +102,7 @@ int main(int argc, char *argv[]) {
                 if((input = realloc(input, count*sizeof(char*))) == NULL) {
                     printf("e: %i\n", errno);
                     perror("realloc failed to seperate input");
-                    write(STDERR_FILENO, error_msg, 30);
+                    //write(STDERR_FILENO, error_msg, 30);
                     exit(1);
                 }
                 input[count-2] = strdup(strsep(&line, " ")); // seperate contents of line by space pointed to by an array of char pointers
@@ -92,7 +118,16 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 else if(strcmp(*cmd, "path") == 0) {
-                    if(makePath(cmd, &path, count-1) != 0)
+<<<<<<< HEAD
+=======
+                    if(linelen == 5) {
+                        char** it = path;
+                        puts("the path is");
+                        for(; it && *it; it++)
+                            printf("%s\n", *it);
+                    }
+                    else if(makePath(cmd, &path, count-1) < 0)
+>>>>>>> redirection
                         perror("setting path failed");
                     printf("wish> ");
                     continue;
@@ -100,12 +135,14 @@ int main(int argc, char *argv[]) {
                 else
                     defaultCommands(path); // i.e a shell command
             }
+            int newOp;
 
             pid = fork();
             if(pid < 0) {
                 puts("wish: Fork error");
                 exit(1);
             } else if(pid == 0) {
+                redirection(count, &newOp);
                 execv(*cmd, cmd);
                 printf("e: %i\n", errno);
                 perror("exec error");
@@ -124,7 +161,7 @@ int main(int argc, char *argv[]) {
     } else if(argc == 2) {
         FILE* cmd = fopen(argv[1], "r");
         if(cmd == NULL) {
-            write(STDERR_FILENO, error_msg, 30);
+            //write(STDERR_FILENO, error_msg, 30);
             exit(1);
         }
 
