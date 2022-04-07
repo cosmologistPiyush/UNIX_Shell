@@ -3,7 +3,7 @@
 extern bool redirection;
 
 commands* effIpProcessing(char** string, size_t len) {
-    input *allcmds = malloc(sizeof(input));
+    input_s *allcmds = malloc(sizeof(input_s));
     commands *data = malloc(sizeof(commands));
     if(!allcmds || !data)
         goto out;
@@ -31,7 +31,7 @@ commands* effIpProcessing(char** string, size_t len) {
                 ss[sic-2] = 1;
                 ss[sic-1] = '\0';
                 data->num += 1;
-                allcmds = realloc(allcmds, data->num*sizeof(input));
+                allcmds = realloc(allcmds, data->num*sizeof(input_s));
                 if(allcmds == NULL)
                     goto out;
                 sic= 0;
@@ -67,7 +67,7 @@ commands* effIpProcessing(char** string, size_t len) {
                     ss = malloc(sizeof(size_t));
                     if(ss == NULL)
                         goto out;
-                    ss[sic] = 0;
+                    ss[0] = 0;
                     sic = 1;
                 }
                 ss[sic-1] += 1;
@@ -101,7 +101,7 @@ commands* effIpProcessing(char** string, size_t len) {
 
 out:
     free(data);
-    for(input* ip = allcmds; ip; ip++) {
+    for(input_s* ip = allcmds; ip; ip++) {
         if(ip->stringsize)
             free(ip->stringsize);
     }
@@ -114,7 +114,7 @@ out:
 #undef sic
 }
 
-char*** creatingArray(commands* data, input* allcmds, char** line, size_t len) {
+char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len) {
 
     data->cmds = calloc(data->num, sizeof(char**));
     if(data->cmds == NULL)
@@ -199,7 +199,7 @@ out:
     size_t linecap=0, i;
     ssize_t linelen;
     commands *all;
-    puts("input enter");
+    puts("input_s enter");
     linelen = getline(&line, &linecap, stdin);
     assert(linelen != 0);
     puts("processing begins");

@@ -8,8 +8,8 @@
 
 typedef struct inputsize {
     size_t strsincmd;
-    size_t* stringsize;
-}input;
+    size_t* stringsize; //treated as an array. stringsize[n] = characters in (n+1)th str.
+}input_s;
 
 typedef struct commands {
     char*** cmds;
@@ -25,5 +25,5 @@ extern bool redirection;
 int cd(char**, size_t);
 int makePath(char**,char***, size_t);
 
-char*** creatingArray(commands* data, input* allcmds, char** line, size_t len);
-commands* effIpProcessing(char** string, size_t len);
+char*** creatingArray(commands*, input_s*, char**, size_t);
+commands* effIpProcessing(char**, size_t);

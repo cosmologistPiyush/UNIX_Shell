@@ -1,15 +1,21 @@
+# set compiler
+CC = gcc
+CFLAGS = -Wall -Werror
+
 ch-dir.o: ch-dir.c helper.h
-	clang -c ch-dir.c
+	$(CC) -c ch-dir.c
 
 path.o: path.c helper.h
-	clang -c path.c
+	$(CC) -c path.c
 
 masterip.o: masterip.c helper.h
-	clang -c masterip.c
+	$(CC) -c masterip.c
 
 pshell.o: pshell.c helper.h
-	clang -c pshell.c
+	$(CC) -c pshell.c
 
 pshell: pshell.o ch-dir.o path.o masterip.o
-	clang -o pshell pshell.o ch-dir.o path.o masterip.o
+	$(CC) $(CFALGS) -o pshell pshell.o ch-dir.o path.o masterip.o
 
+pshellg: pshell.o ch-dir.o path.o masterip.o
+	$(CC) $(CFLAGS) -g -o pshell pshell.o ch-dir.o path.o masterip.o
