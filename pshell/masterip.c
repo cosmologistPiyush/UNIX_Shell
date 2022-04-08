@@ -1,12 +1,13 @@
 #include"helper.h"
 
-extern bool redirection;
+extern int redirection;
+static bool new_cmd = false;
 
 commands* effIpProcessing(char** string, size_t len) {
-    input_s *allcmds = malloc(sizeof(input_s));
+	input_s *allcmds = malloc(sizeof(input_s));
     commands *data = malloc(sizeof(commands));
     if(!allcmds || !data)
-        goto out;
+        goto intermediateout;
     data->cmds = NULL;
     data->num = 1;
     size_t i;
@@ -14,101 +15,118 @@ commands* effIpProcessing(char** string, size_t len) {
 
 #define nc data->num-1
 #define sic allcmds[nc].strsincmd
-#define ss allcmds[nc].stringsize
+#define ss allcmds[nc].charsinstr
 
     sic = 0;
     char* line = *string;
 
     /* calculating the amount of memory required */
+	new_cmd = true;
 
     for(i=0; i<len; i++) {
         switch(line[i]) {
             case '&':
-                sic += 2;
-                ss = realloc(ss, sic*sizeof(size_t));
-                if(ss == NULL)
-                    goto out;
-                ss[sic-2] = 1;
+			case ';':
+				if (line[i-1] == ' ')
+					sic += 1;
+				else
+					sic += 2;
+				ss = realloc(ss, sic*sizeof(size_t));
+				if(ss == NULL)
+					goto intermediateout;
+				ss[sic-2] = 1;
                 ss[sic-1] = '\0';
-                data->num += 1;
-                allcmds = realloc(allcmds, data->num*sizeof(input_s));
-                if(allcmds == NULL)
-                    goto out;
-                sic= 0;
+				new_cmd = false;
                 break;
 
             case '>':
-                sic += 1;
-                ss = realloc(ss, sic*sizeof(size_t));
-                if(ss == NULL)
-                    goto out;
+				if (!(line[i-1] == ' '))
+					sic += 1;
+				if(line[i+1] != ' ') {
+					sic+= 1;
+					ss = realloc(ss, sic*sizeof(size_t));
+					if(ss == NULL)
+						goto intermediateout;
+					ss[sic-2] = 1;
+					ss[sic-1] = 0;
+					break;
+				}
+				ss = realloc(ss, sic*sizeof(size_t));
+				if(ss == NULL)
+					goto intermediateout;
                 ss[sic-1] = 1;
-                if(line[i+1] != ' ') {
-                    sic+= 1;
-                    ss = realloc(ss, sic*sizeof(size_t));
-                    if(ss == NULL)
-                        goto out;
-                    ss[sic-1] = 0;
-                }
                 break;
 
             case ' ':
-                if(line[i-1] == '&' || line[i+1] == '&' || line[i-1] == ' ' || line[i+1] == '>' || line[i+1] == '\0')
+                if((!new_cmd) || line[i+1] == ' ')
                     break;
                 sic += 1;
                 ss = realloc(ss, sic*sizeof(size_t));
                 if(ss == NULL)
-                    goto out;
-                ss[sic-1] = 0;
+                    goto intermediateout;
+
+				ss[sic-1] = 0;
+
                 break;
 
             default:
+				if (!new_cmd) {
+					data->num += 1;
+					allcmds = realloc(allcmds, data->num*sizeof(input_s));
+					if(allcmds == NULL)
+						goto intermediateout;
+					sic= 0;
+
+					new_cmd = true;
+				}
+
                 if(sic == 0) {
                     ss = malloc(sizeof(size_t));
                     if(ss == NULL)
-                        goto out;
+                        goto intermediateout;
                     ss[0] = 0;
                     sic = 1;
                 }
                 ss[sic-1] += 1;
                 break;
-        }
-    }
+			}
+		}
+		/* corner case of single word input */
+	if (ss[sic-1] == 0)
+		ss[sic-1] = '\0';
+	if (ss[sic-1] != '\0') {
+		sic += 1;
+		ss = realloc(ss, sic*sizeof(size_t));
+		if (ss == NULL)
+			goto intermediateout;
+		ss[sic-1] = '\0';
+	}
 
-    if(ss[sic-1] != '\0') {
-        sic += 1;
-        ss = realloc(ss, sic*sizeof(size_t));
-        if(ss == NULL)
-            goto out;
-        ss[sic-1] = '\0';
-    }
+
+
 
     /* populating the array */
-    if(sic == 0) {
-        data->num -= 1;
-        data->cmds = creatingArray(data, allcmds, string, len);
-        data->num += 1;
-    } else
-        data->cmds = creatingArray(data, allcmds, string, len);
+	data->cmds = creatingArray(data, allcmds, string, len);
 
     /* freeing the memory */
 
     for(size_t i=0; i<nc; i++)
-        free(allcmds[i].stringsize);
+        free(allcmds[i].charsinstr);
     free(allcmds);
 
     return data;
 
-out:
+intermediateout:
     free(data);
     for(input_s* ip = allcmds; ip; ip++) {
-        if(ip->stringsize)
-            free(ip->stringsize);
+        if(ip->charsinstr)
+            free(ip->charsinstr);
     }
     free(allcmds);
 
     perror("realloc/malloc failed");
     exit(1);
+
 
 #undef ss
 #undef sic
@@ -118,23 +136,23 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
 
     data->cmds = calloc(data->num, sizeof(char**));
     if(data->cmds == NULL)
-        goto out;
+        goto mainout;
 
     char*** cmd = data->cmds;
 
 #define sic allcmds[i].strsincmd
-#define ss allcmds[i].stringsize
+#define ss allcmds[i].charsinstr
 
     /*allocating the memory for the array*/
     size_t i, j;
     for(i=0; i<=nc; i++) {
         cmd[i] = calloc(sic, sizeof(char*));
         if(cmd[i] == NULL)
-            goto out;
+            goto mainout;
         for(j=0; ss[j] != '\0'; j++) {
             cmd[i][j] = calloc(ss[j], sizeof(char));
             if(cmd[i][j] == NULL)
-                goto out;
+                goto mainout;
         }
         cmd[i][j] = NULL;
     }
@@ -142,19 +160,20 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
     /* filling the array memory */
     char* ptr = *line;
     i = j = 0;
+	new_cmd = false;
     while(*ptr != '\n') {
         switch(*ptr) {
             case '&':
                 j++;
                 memcpy(cmd[i][j], ptr, ss[j]);
-                i++;
-                j=0;
+				new_cmd = false;
+				i++;
                 ptr++;
                 break;
 
             case '>':
-                j++;
-                redirection = true;
+				j++;
+                redirection += 1;
                 memcpy(cmd[i][j], ptr, ss[j]);
                 if(*(ptr+1) != ' ')
                     j++;
@@ -162,7 +181,7 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
                 break;
 
             case ' ':
-                if(*(ptr-1) == '&' || *(ptr+1) == '&' || *(ptr-1) == ' ' || *(ptr+1) == '>' || *(ptr+1) == '\0') {
+                if((!new_cmd) || *(ptr+1) == ' ' || *(ptr+1) == '&' || *(ptr+1) == '>') {
                 }
                 else
                     j++;
@@ -170,6 +189,10 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
                 break;
 
             default:
+				if (!new_cmd) {
+					j=0;
+					new_cmd = true;
+				}
                 memcpy(cmd[i][j], ptr, ss[j]);
                 ptr += ss[j];
                 break;
@@ -177,7 +200,7 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
     }
     return cmd;
 
-out:
+mainout:
     for(char*** ip = data->cmds; ip; ip++) {
         for(char** it = *ip; it && *it; it++)
             free(*it);
@@ -186,7 +209,6 @@ out:
     free(data->cmds);
     perror("calloc/malloc failed");
     exit(1);
-
 
 #undef ss
 #undef sic
@@ -213,12 +235,13 @@ out:
             printf("string: %s\n", *j);
         }
     }
+	puts("print done");
 
     for(i=0; i<all->num; i++) {
         for(j = all->cmds[i]; j && *j; j++)
             free(*j);
     }
-    printf("success\n");
+	puts("freed indiv cmds");
 
     free(all->cmds);
     free(all);

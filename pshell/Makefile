@@ -2,6 +2,7 @@ CC = gcc
 
 CFLAGS = -Wall
 CFLAGS += -Werror
+CFLAGS += -g
 
 SOURCES = ch-dir.c
 SOURCES += path.c

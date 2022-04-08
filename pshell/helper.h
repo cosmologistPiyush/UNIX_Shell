@@ -8,7 +8,7 @@
 
 typedef struct inputsize {
     size_t strsincmd;
-    size_t* stringsize; //treated as an array. stringsize[n] = characters in (n+1)th str.
+    size_t* charsinstr; //treated as an array. stringsize[n] = characters in (n+1)th str.
 }input_s;
 
 typedef struct commands {
@@ -16,12 +16,14 @@ typedef struct commands {
     size_t num;
 }commands;
 
+typedef enum command_type { NORMAL, MULTIPLE, BACKGROUND } cmd_type;
+
 typedef struct custom_pid_t {
     pid_t pid;
-    bool backgrd;
+    cmd_type type;
 } cpid_t;
 
-extern bool redirection;
+extern int redirection;
 int cd(char**, size_t);
 int makePath(char**,char***, size_t);
 
