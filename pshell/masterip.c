@@ -1,6 +1,6 @@
-#include"helper.h"
+#include "helper.h"
 
-extern int redirection;
+extern bool redirection;
 static bool new_cmd = false;
 
 commands* effIpProcessing(char** string, size_t len) {
@@ -26,7 +26,6 @@ commands* effIpProcessing(char** string, size_t len) {
     for(i=0; i<len; i++) {
         switch(line[i]) {
             case '&':
-			case ';':
 				if (line[i-1] == ' ')
 					sic += 1;
 				else
@@ -35,6 +34,15 @@ commands* effIpProcessing(char** string, size_t len) {
 				if(ss == NULL)
 					goto intermediateout;
 				ss[sic-2] = 1;
+                ss[sic-1] = '\0';
+				new_cmd = false;
+                break;
+			case ';':
+				if (!(line[i-1] == ' '))
+					sic += 1;
+				ss = realloc(ss, sic*sizeof(size_t));
+				if(ss == NULL)
+					goto intermediateout;
                 ss[sic-1] = '\0';
 				new_cmd = false;
                 break;
@@ -138,7 +146,7 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
     if(data->cmds == NULL)
         goto mainout;
 
-    char*** cmd = data->cmds;
+    char*** cmds = data->cmds;
 
 #define sic allcmds[i].strsincmd
 #define ss allcmds[i].charsinstr
@@ -146,15 +154,15 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
     /*allocating the memory for the array*/
     size_t i, j;
     for(i=0; i<=nc; i++) {
-        cmd[i] = calloc(sic, sizeof(char*));
-        if(cmd[i] == NULL)
+        cmds[i] = calloc(sic, sizeof(char*));
+        if(cmds[i] == NULL)
             goto mainout;
         for(j=0; ss[j] != '\0'; j++) {
-            cmd[i][j] = calloc(ss[j], sizeof(char));
-            if(cmd[i][j] == NULL)
+            cmds[i][j] = calloc(ss[j], sizeof(char));
+            if(cmds[i][j] == NULL)
                 goto mainout;
         }
-        cmd[i][j] = NULL;
+        cmds[i][j] = NULL;
     }
 
     /* filling the array memory */
@@ -165,7 +173,8 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
         switch(*ptr) {
             case '&':
                 j++;
-                memcpy(cmd[i][j], ptr, ss[j]);
+                memcpy(cmds[i][j], ptr, ss[j]);
+			case ';':
 				new_cmd = false;
 				i++;
                 ptr++;
@@ -173,8 +182,8 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
 
             case '>':
 				j++;
-                redirection += 1;
-                memcpy(cmd[i][j], ptr, ss[j]);
+                redirection = true;
+                memcpy(cmds[i][j], ptr, ss[j]);
                 if(*(ptr+1) != ' ')
                     j++;
                 ptr++;
@@ -193,12 +202,12 @@ char*** creatingArray(commands* data, input_s* allcmds, char** line, size_t len)
 					j=0;
 					new_cmd = true;
 				}
-                memcpy(cmd[i][j], ptr, ss[j]);
+                memcpy(cmds[i][j], ptr, ss[j]);
                 ptr += ss[j];
                 break;
         }
     }
-    return cmd;
+    return cmds;
 
 mainout:
     for(char*** ip = data->cmds; ip; ip++) {

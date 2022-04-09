@@ -8,6 +8,7 @@ SOURCES = ch-dir.c
 SOURCES += path.c
 SOURCES += pshell.c
 SOURCES += masterip.c
+SOURCES += helper.c
 
 OBJECTS = $(SOURCES:.c=.o)
 

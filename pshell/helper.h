@@ -1,10 +1,10 @@
-#include<stdio.h>
-#include<string.h>
-#include<stdlib.h>
-#include<unistd.h>
-#include<errno.h>
-#include<stdbool.h>
-#include<assert.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <assert.h>
 
 typedef struct inputsize {
     size_t strsincmd;
@@ -16,16 +16,23 @@ typedef struct commands {
     size_t num;
 }commands;
 
-typedef enum command_type { NORMAL, MULTIPLE, BACKGROUND } cmd_type;
-
 typedef struct custom_pid_t {
     pid_t pid;
-    cmd_type type;
+    bool background;
 } cpid_t;
 
-extern int redirection;
+extern bool redirection;
+extern char **cmd;
+
 int cd(char**, size_t);
 int makePath(char**,char***, size_t);
 
 char*** creatingArray(commands*, input_s*, char**, size_t);
 commands* effIpProcessing(char**, size_t);
+void freePath(char**);
+void defaultCommands(char**);
+
+void child_handler(int);
+void redirect(size_t);
+void freecmdstruct(commands*);
+void freeEverything(commands*, char **, char*);
